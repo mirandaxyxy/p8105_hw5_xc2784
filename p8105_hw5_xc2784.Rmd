@@ -10,10 +10,11 @@ library(tidyverse)
 library(broom)
 ```
 
+### problem 1
 ```{r}
 duplicate_birthday <- function(n, days = 365) {
   birthdays <- sample.int(days, n, replace = TRUE)
-  return(duplicated(birthdays))
+  any(duplicated(birthdays))
 }
 ```
 
@@ -28,7 +29,74 @@ prob_shared <- sapply(group_sizes, sim_prob)
 plot(group_sizes, prob_shared,
      xlab = "Group size (n)",
      ylab = "Probability of at least two people sharing a birthday",
-     main = "Birthday Problem Simulation (10,000 Replications)")
-abline(h = 0.5, lty = 2)
+     main = "Birthday Simulation (10,000 Replications)")
 ```
+The plot shows the probability that at least two people in a group share a birthday as the group size increases from 2 to 50. The curve starts near zero for very small groups and rises slowly at first, but then increases rapidly between group sizes of about 15 to 30, and approaches 1 when the group size grows to about 50.
+
+### problem 2
+```{r}
+set.seed(10)
+n <- 30
+sigma <- 5
+mu_values <- 0:6
+reps <- 5000L
+alpha <- 0.05
+```
+
+```{r}
+simulate1 <- function(mu, n, sigma) {
+    x <- rnorm(n, mean = mu, sd = sigma)
+    test <- t.test(x, mu = 0)
+    tibble(
+    mu      = mu,
+    mu_hat  = mean(x),
+    p_value = tidy(test)$p.value
+  )
+}
+
+simulation_results <- mu_values %>%  
+  map_df(~ bind_rows(replicate(reps, simulate1(.x, n, sigma), simplify = FALSE))
+)
+
+dplyr::glimpse(simulation_results)
+```
+```{r}
+summary_results <- simulation_results %>%
+  mutate(reject = p_value < alpha) %>% 
+  group_by(mu) %>%
+  summarise(
+    power = mean(reject),
+    avg_mu_hat = mean(mu_hat),
+    avg_mu_hat_reject = mean(mu_hat[reject])
+  )
+
+dplyr::glimpse(summary_results)
+```
+```{r}
+ggplot(summary_results, aes(x = mu, y = power)) +
+  geom_line() +
+  geom_point() +
+  labs(
+    title = "Power Curve for One-Sample t-test (n = 30, 𝜎=5)",
+    x = "True mean (μ)",
+    y = "Power (Probability of Rejecting H0)"
+  ) +
+  theme_minimal()
+
+```
+There is a positive association between effect size and power, that larger true effects are easier to detect.
+
+```{r}
+ggplot(summary_results, aes(x = mu)) +
+  geom_line(aes(y = avg_mu_hat, color = "All samples")) +
+  geom_line(aes(y = avg_mu_hat_reject, color = "Only rejected H0")) +
+  labs(
+    title = "Average Estimated Mean vs. True Mean",
+    x = "True mean (μ)",
+    y = expression(Average~hat(mu))
+  ) +
+  theme_minimal()
+
+```
+No, the sample average of 𝜇̂ across tests for which the null is rejected is not approximately equal to the true value of 𝜇, especially for smaller effect sizes. When we only look at the cases that achieved statistical significance, we’re essentially selecting the samples where random variation happened to make the estimated mean unusually large. This selective process causes the average estimate to be biased upward compared to the true mean. As the true mean increases and the test gains more power, nearly all samples become significant, and this bias become smaller.
 
