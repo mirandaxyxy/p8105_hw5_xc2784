@@ -78,7 +78,7 @@ ggplot(summary_results, aes(x = mu, y = power)) +
   geom_line() +
   geom_point() +
   labs(
-    title = "Power Curve for One-Sample t-test (n = 30, 𝜎=5)",
+    title = "Power Curve for One-Sample t-test (n = 30, sigma = 5)",
     x = "True mean (μ)",
     y = "Power (Probability of Rejecting H0)"
   ) +
@@ -144,7 +144,28 @@ baltimore_tidy
 
 ```
 ```{r}
+city <- homicides %>%
+  mutate(
+    test = map2(unsolved_homicides, total_homicides, ~ prop.test(.x, .y)),
+    tidy = map(test, broom::tidy)
+  ) %>%
+  select(city_state, total_homicides, unsolved_homicides, tidy) %>%
+  unnest(tidy) %>%
+  select(city_state, total_homicides, unsolved_homicides, estimate, conf.low, conf.high) 
 
+glimpse(city)
 ```
-
+```{r fig.width=8, fig.height=7}
+ggplot(city, aes(x = reorder(city_state, estimate), y = estimate)) +
+  geom_point() +
+  geom_errorbar(aes(ymin = conf.low, ymax = conf.high)) +
+  coord_flip() +
+  labs(
+    title = "Proportion of Unsolved Homicides by City (2007–2017)",
+    x = NULL,
+    y = "Estimated Proportion Unsolved (95% CI)"
+  ) +
+  theme_minimal()
+```
+The estimated proportion of unsolved homicides varies widely across cities. Chicago and Baltimore have the highest proportions, while Richmond and Tulsa have the lowest. 
 
